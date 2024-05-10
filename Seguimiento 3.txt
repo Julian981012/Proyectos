@@ -1,0 +1,54 @@
+#define PIN_LED 12
+
+int muestras = 1000;
+int umbral = 500;
+double alpha = 0.02; // Factor de suavizado para el filtro IIR
+
+// Parámetros del filtro
+double frecuenciaDeCorte = 10; // Frecuencia de corte del filtro pasa altas en Hz
+double atenuacion = 3; // Atenuación/orden del filtro
+
+double lastFilteredValue = 0;
+
+void setup() {
+  Serial.begin(9600);
+  pinMode(PIN_LED, OUTPUT);
+}
+
+void loop() {
+  unsigned long sumSquares = 0;
+  
+  // Leer datos analógicos y calcular el cuadrado de cada dato
+  for (int i = 0; i < muestras; i++) {
+    int dato = analogRead(A0); // Leer dato analógico
+    sumSquares += dato * dato; // Sumar el cuadrado de cada dato
+    delay(1); // Breve pausa entre muestras
+  }
+
+  // Calcular el valor RMS sin filtrar
+  double rmsUnfiltered = sqrt((double)sumSquares / muestras);
+
+  // Aplicar filtro IIR pasa altas
+  double tau = 1 / (2 * M_PI * frecuenciaDeCorte);
+  double RC = tau / alpha;
+  double dt = muestras * 0.001; // Intervalo de muestreo en segundos
+  double alphaRC = dt / (RC + dt);
+
+  double filteredValue = alphaRC * rmsUnfiltered + (1 - alphaRC) * lastFilteredValue;
+  lastFilteredValue = filteredValue;
+
+  // Verificar si el valor filtrado supera el umbral
+  if (filteredValue > umbral) {
+    digitalWrite(PIN_LED, HIGH); // Encender el LED
+    delay(100); // Mantener el LED encendido durante un breve período
+    digitalWrite(PIN_LED, LOW); // Apagar el LED
+  }
+
+  // Imprimir el valor filtrado y el valor RMS
+  Serial.print("Filtrado: ");
+  Serial.print(filteredValue);
+  Serial.print(", RMS: ");
+  Serial.println(rmsUnfiltered);
+
+  delay(500); // Esperar un breve tiempo antes de tomar la siguiente muestra
+}
